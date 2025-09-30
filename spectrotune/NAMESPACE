@@ -1,3 +1,4 @@
 export(st_preprocess)
 export(st_model)
 export(st_run)
+export(st_plot_best)

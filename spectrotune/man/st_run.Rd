@@ -20,29 +20,41 @@ st_run(
 )
 }
 \arguments{
-\item{data}{data.frame with spectral columns named by wavelength and a target column}
+\item{data}{data.frame with spectral columns named by wavelength (e.g., "400","405",...)}
 
-\item{target}{character, name of the target column in data}
+\item{target}{character, name of the target column in \code{data} (numeric → regression; factor/character → classification)}
 
-\item{preprocess}{character vector of pretreatments}
+\item{preprocess}{character vector of pretreatments to evaluate. Supported: "RAW","ABS","SNV","SG0","SG1","SG2","MSC".}
 
-\item{preprocess_params}{named list of parameter lists for pretreatments}
+\item{preprocess_params}{named list of parameter lists per pretreatment, e.g. \code{list(SG1 = list(w=17,p=2,m=1))}.}
 
-\item{noise_range}{numeric length-2 to exclude (or NULL)}
+\item{noise_range}{optional numeric length-2 range to exclude (e.g., c(700,705))}
 
-\item{wl_keep}{single length-2 or list of ranges to keep (or NULL)}
+\item{wl_keep}{optional length-2 numeric or list of ranges to keep}
 
-\item{algos}{character vector among c("PLSR","SVR")}
+\item{algos}{character vector of algorithms. Regression: "PLSR","SVR","GLMNET","RIDGE","KRR_RBF","RF","XGB_PCA". Classification: "SVM","GLMNET","RF","XGB_PCA".}
 
-\item{outer_k, outer_rep, inner_k}{integers for nested CV}
+\item{outer_k, outer_rep, inner_k}{integers controlling outer/inner folds and repeats}
 
-\item{seed}{integer}
+\item{seed}{integer seed for reproducibility}
 
-\item{verbose}{logical, print progress}
+\item{verbose}{logical, print progress bars/messages}
 }
 \value{
-list(results, summary, best) from st_model
+list with: \code{results} (OOF predictions), \code{summary} (metrics per pipeline), \code{best} (top row)
 }
 \description{
-One-call convenience: preprocess + model
+Runs spectral pretreatment(s) and nested cross‑validation with selected algorithms.
+}
+\examples{
+# Regression
+# fit <- st_run(df, target = "Age", preprocess = c("ABS","SG1"),
+#               preprocess_params = list(SG1 = list(w=17,p=2,m=1)),
+#               algos = c("PLSR","SVR"), outer_k=5, inner_k=5, outer_rep=2)
+
+# Classification
+# df$Class <- as.factor(df$Class)
+# fit <- st_run(df, target = "Class", preprocess = c("ABS","SG1"),
+#               algos = c("SVM","GLMNET"), outer_k=5, inner_k=5, outer_rep=2)
+
 }

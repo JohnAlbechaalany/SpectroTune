@@ -7,12 +7,16 @@
 st_model(
   X_list,
   y,
-  algos = c("PLSR", "SVR"),
+  algos = c("PLSR", "SVR", "GLMNET", "RIDGE", "KRR_RBF", "RF", "XGB_PCA"),
   outer_k = 5,
   outer_rep = 2,
   inner_k = 5,
   seed = 42,
-  verbose = FALSE
+  verbose = FALSE,
+  dependent_sampling = c("random", "stratified_bin"),
+  dependent_bins = 5,
+  independent_sampling = c("random", "stratified"),
+  stratify = NULL
 )
 }
 \arguments{
@@ -20,13 +24,21 @@ st_model(
 
 \item{y}{numeric response}
 
-\item{algos}{character vector among c("PLSR","SVR")}
+\item{algos}{character vector among c("PLSR","SVR","GLMNET","RIDGE","KRR_RBF","RF","XGB_PCA")}
 
 \item{outer_k, outer_rep, inner_k}{integers for nested CV}
 
 \item{seed}{integer}
 
 \item{verbose}{logical, print progress}
+
+\item{dependent_sampling}{character: "random" or "stratified_bin" (for numeric y)}
+
+\item{dependent_bins}{integer number of quantile bins when dependent_sampling = "stratified_bin"}
+
+\item{independent_sampling}{character: "random" or "stratified"}
+
+\item{stratify}{factor or list/data.frame of factors to balance when independent_sampling = "stratified"}
 }
 \value{
 list(results = long tibble, summary = per-pipeline metrics, best = top row)

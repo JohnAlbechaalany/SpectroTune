@@ -14,8 +14,9 @@
 #' @section Algorithms:
 #' \itemize{
 #'   \item \emph{Regression}: PLSR, SVR (RBF), GLMNET (Elastic Net), RIDGE, Kernel Ridge (RBF),
-#'         Random Forest, XGBoost on PCA scores
-#'   \item \emph{Classification}: SVM (RBF), GLMNET (logistic/multinomial), Random Forest, XGBoost on PCA scores
+#'         Random Forest, XGBoost on PCA scores (XGB_PCA), Random Forest on PCA scores (RF_PCA)
+#'   \item \emph{Classification}: SVM (RBF), GLMNET (logistic/multinomial), Random Forest,
+#'         XGBoost on PCA scores (XGB_PCA), PLS-DA, Random Forest on PCA scores (RF_PCA)
 #' }
 #'
 #' @section Sampling:

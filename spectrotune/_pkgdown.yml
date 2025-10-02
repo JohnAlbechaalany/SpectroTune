@@ -8,8 +8,6 @@ home:
   title: SpectroTune
   description: |
     Comprehensive spectral data analysis package for pretreatment, model benchmarking, and visualization.
-  sidebar:
-    structure: [links, license, community, citation, authors, dev]
   authors:
     John Albechaalany:
       href: mailto:Johnbechaalany@gmail.com

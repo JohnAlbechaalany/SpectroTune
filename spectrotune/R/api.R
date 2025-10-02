@@ -10,7 +10,7 @@
 #'   For chained pipelines, step-specific parameters are looked up by step name (e.g., `SG1`).
 #' @param noise_range optional numeric length-2 range to exclude (e.g., c(700,705))
 #' @param wl_keep optional length-2 numeric or list of ranges to keep
-#' @param algos character vector of algorithms. Regression: "PLSR","SVR","GLMNET","RIDGE","KRR_RBF","RF","XGB_PCA". Classification: "SVM","GLMNET","RF","XGB_PCA".
+#' @param algos character vector of algorithms. Regression: "PLSR","SVR","GLMNET","RIDGE","KRR_RBF","RF","XGB_PCA","RF_PCA". Classification: "SVM","GLMNET","RF","XGB_PCA","PLSDA","RF_PCA".
 #' @param outer_k,outer_rep,inner_k integers controlling outer/inner folds and repeats
 #' @param seed integer seed for reproducibility
 #' @param verbose logical, print progress bars/messages

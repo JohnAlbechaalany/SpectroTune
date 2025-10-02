@@ -30,6 +30,7 @@ First, install the package:
 install.packages("remotes")   
 remotes::install_github("JohnAlbechaalany/SpectroTune/spectrotune", build_vignettes = TRUE)
 library(spectrotune)
+help(package = "spectrotune")
 ```
 
 ```{r load}

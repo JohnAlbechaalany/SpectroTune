@@ -336,7 +336,12 @@ st_model <- function(X_list,
     predict(model$rf, data = df_scores)$predictions
   }
   # PLS-DA via mixOmics
-  fit_plsda <- function(X, y, ncomp) mixOmics::plsda(X, y, ncomp = ncomp)
+  fit_plsda <- function(X, y, ncomp) {
+    if (!requireNamespace("mixOmics", quietly = TRUE)) {
+      stop("Package 'mixOmics' required for PLSDA. Install with: install.packages('mixOmics')")
+    }
+    mixOmics::plsda(X, y, ncomp = ncomp)
+  }
   predict_plsda <- function(model, Xnew) as.factor(predict(model, Xnew)$class$max.dist)
   # folds (classification: stratify by y, plus optional independent stratify)
   to_factor <- function(x) { if (is.factor(x)) x else as.factor(x) }

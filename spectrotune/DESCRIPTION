@@ -23,13 +23,13 @@ Imports:
     glmnet,
     ranger,
     xgboost,
-    mixOmics,
     magrittr
 Suggests:
     testthat,
     knitr,
     rmarkdown,
-    pkgdown
+    pkgdown,
+    mixOmics
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

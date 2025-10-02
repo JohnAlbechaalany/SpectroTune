@@ -27,9 +27,9 @@ SpectroTune is an R package designed for spectral data analysis, providing tools
 First, install the package:
 
 ```{r install, eval = FALSE}
-# Utilisez le chemin complet
-devtools::document("C:/Users/user/Desktop/Work/SpectroTune/spectrotune")
-devtools::install("C:/Users/user/Desktop/Work/SpectroTune/spectrotune")
+install.packages("remotes")   
+remotes::install_github("JohnAlbechaalany/SpectroTune/spectrotune", build_vignettes = TRUE)
+library(spectrotune)
 ```
 
 ```{r load}

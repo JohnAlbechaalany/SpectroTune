@@ -36,7 +36,6 @@
 #' @section Getting started:
 #' See \code{?st_run} examples for regression and classification end-to-end usage.
 #'
-#' @docType package
-#' @name spectrotune
-NULL
+#' @keywords internal
+"_PACKAGE"
 

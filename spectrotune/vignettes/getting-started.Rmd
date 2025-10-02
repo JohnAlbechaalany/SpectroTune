@@ -1,0 +1,250 @@
+---
+title: "Getting Started with SpectroTune"
+author: "John Albechaalany"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with SpectroTune}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+# Introduction
+
+SpectroTune is an R package designed for spectral data analysis, providing tools for pretreatment, model benchmarking, and visualization. This vignette will guide you through the basic usage of SpectroTune.
+
+## Installation
+
+First, install the package:
+
+```{r install, eval = FALSE}
+# Utilisez le chemin complet
+devtools::document("C:/Users/user/Desktop/Work/SpectroTune/spectrotune")
+devtools::install("C:/Users/user/Desktop/Work/SpectroTune/spectrotune")
+```
+
+```{r load}
+library(spectrotune)
+library(ggplot2)
+```
+
+## Sample Data
+
+Let's start with the included sample dataset:
+
+```{r data}
+data(sample_spectra)
+head(sample_spectra[, 1:10])
+```
+
+```{r summary}
+summary(sample_spectra$Age)
+table(sample_spectra$Class)
+```
+
+## Basic Workflow
+
+### 1. Spectral Preprocessing
+
+The `st_preprocess()` function applies various pretreatment methods to your spectral data:
+
+```{r preprocess}
+# Apply multiple pretreatments
+pp <- st_preprocess(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("RAW", "ABS", "SG1", "SNV"),
+  preprocess_params = list(SG1 = list(w = 17, p = 2, m = 1)),
+  noise_range = c(700, 705)  # Exclude noisy region
+)
+
+# Check the results
+names(pp$X)
+dim(pp$X$RAW)
+```
+
+### 2. Model Training and Validation
+
+Use `st_model()` to run nested cross-validation:
+
+```{r model, eval = FALSE}
+# Run nested CV with multiple algorithms
+fit <- st_model(
+  X_list = pp$X,
+  y = pp$y,
+  algos = c("PLSR", "SVR", "RF"),
+  outer_k = 5,
+  outer_rep = 2,
+  inner_k = 5,
+  seed = 42,
+  verbose = TRUE
+)
+fit$summary
+```
+
+### 3. One-Call Convenience Function
+
+For most users, `st_run()` combines preprocessing and modeling:
+
+```{r run, eval = FALSE}
+# Complete workflow in one call
+fit <- st_run(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("ABS", "SNV"),
+  preprocess_params = list(SG1 = list(w = 17, p = 2, m = 1)),
+  algos = c("PLSR", "SVR","RF_PCA"),
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 2,
+  seed = 42,
+  verbose = TRUE
+)
+```
+
+## Results Analysis
+
+### View Summary Statistics
+
+```{r results, eval = FALSE}
+# View performance summary
+fit$summary
+
+# Best performing pipeline
+fit$best
+```
+
+### Visualization
+
+```{r plot, eval = FALSE}
+# Plot best model performance
+p <- st_plot_best(fit)
+print(p)
+```
+
+## Classification Example
+
+For classification tasks, ensure your target is a factor:
+
+```{r classification, eval = FALSE}
+# Classification workflow
+fit_cls <- st_run(
+  data = sample_spectra,
+  target = "Class",
+  preprocess = c("ABS", "SG1"),
+  algos = c("SVM", "RF", "GLMNET"),
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 2,
+  seed = 42,
+  verbose = TRUE
+)
+
+# View classification results
+fit_cls$summary
+st_plot_best(fit_cls)
+```
+
+## Advanced Features
+
+### Chained Preprocessing
+
+You can chain multiple preprocessing steps:
+
+```{r chain, eval = FALSE}
+# Chain preprocessing steps
+fit_chain <- st_run(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = "ABS+SG1+SNV",  # Chained pipeline
+  algos = c("PLSR"),
+  outer_k = 5,
+  inner_k = 5,
+  seed = 42,
+  verbose = TRUE
+)
+
+fit_chain$summary
+st_plot_best(fit_chain)
+```
+
+### Stratified Sampling
+
+For better validation, use stratified sampling:
+
+```{r stratified, eval = FALSE}
+# Stratified sampling by target bins
+fit_strat <- st_run(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("ABS", "SG1"),
+  algos = c("PLSR", "SVR"),
+  outer_k = 5,
+  inner_k = 5,
+  seed = 42,
+  dependent_sampling = "stratified_bin",
+  dependent_bins = 5
+)
+```
+
+### Covariate Stratification
+
+Balance folds by external factors:
+
+```{r covariate, eval = FALSE}
+# Stratify by breed and sex
+fit_cov <- st_run(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("ABS", "SG1"),
+  algos = c("PLSR", "SVR"),
+  outer_k = 5,
+  inner_k = 5,
+  seed = 42,
+  independent_sampling = "stratified",
+  stratify = list(breed = sample_spectra$breed, 
+                  sex = sample_spectra$sex)
+)
+```
+
+## Saving Final Models
+
+Once you've identified the best pipeline, save it for deployment:
+
+```{r save, eval = FALSE}
+# Fit final model on full dataset
+final_model <- st_fit_final(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = "SG1",
+  algo = "SVR",
+  preprocess_params = list(w = 17, p = 2, m = 1),
+  inner_k = 5,
+  seed = 42
+)
+
+# Save to file
+st_save_final(final_model, "my_spectral_model.rds")
+```
+
+## Next Steps
+
+- Explore the [Advanced Features](advanced-features.html) vignette
+- Check out [Model Comparison](model-comparison.html) for detailed analysis
+- See [Troubleshooting](troubleshooting.html) for common issues
+
+## References
+
+For more information about spectral analysis methods:
+
+- Savitzky, A., & Golay, M. J. (1964). Smoothing and differentiation of data by simplified least squares procedures. *Analytical chemistry*, 36(8), 1627-1639.
+- Barnes, R. J., Dhanoa, M. S., & Lister, S. J. (1989). Standard normal variate transformation and de-trending of near-infrared diffuse reflectance spectra. *Applied spectroscopy*, 43(5), 772-777.

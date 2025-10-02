@@ -1,0 +1,354 @@
+---
+title: "Advanced Features in SpectroTune"
+author: "John Albechaalany"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Advanced Features in SpectroTune}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 6
+)
+```
+
+# Advanced Features
+
+This vignette covers advanced features and customization options in SpectroTune.
+
+```{r load}
+library(spectrotune)
+library(ggplot2)
+library(dplyr)
+```
+
+## Custom Preprocessing Parameters
+
+### Savitzky-Golay Filtering
+
+Fine-tune Savitzky-Golay parameters for optimal smoothing:
+
+```{r sg_params, eval = FALSE}
+# Custom SG parameters
+pp <- st_preprocess(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("SG0", "SG1", "SG2"),
+  preprocess_params = list(
+    SG0 = list(w = 11, p = 2, m = 0),  # Smoothing only
+    SG1 = list(w = 17, p = 3, m = 1),  # First derivative
+    SG2 = list(w = 21, p = 4, m = 2)   # Second derivative
+  )
+)
+```
+
+### Wavelength Range Control
+
+Select specific wavelength ranges for analysis:
+
+```{r wavelength_control, eval = FALSE}
+# Keep only specific ranges
+pp <- st_preprocess(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("ABS", "SNV"),
+  wl_keep = list(c(400, 1000), c(1500, 2000))  # Multiple ranges
+)
+
+# Exclude noisy regions
+pp <- st_preprocess(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("ABS", "SNV"),
+  noise_range = c(700, 705)  # Exclude this range
+)
+```
+
+## Algorithm Selection and Tuning
+
+### Regression Algorithms
+
+```{r regression_algorithms, eval = FALSE}
+# All available regression algorithms
+reg_algorithms <- c("PLSR", "SVR", "GLMNET", "RIDGE", "KRR_RBF", "RF", "XGB_PCA", "RF_PCA")
+
+fit_reg <- st_run(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("ABS", "SG1"),
+  algos = reg_algorithms,
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 2,
+  seed = 42,
+  verbose = TRUE
+)
+```
+
+### Classification Algorithms
+
+```{r classification_algorithms, eval = FALSE}
+# All available classification algorithms
+cls_algorithms <- c("SVM", "GLMNET", "RF", "XGB_PCA", "PLSDA", "RF_PCA")
+
+fit_cls <- st_run(
+  data = sample_spectra,
+  target = "Class",
+  preprocess = c("ABS", "SG1"),
+  algos = cls_algorithms,
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 2,
+  seed = 42,
+  verbose = TRUE
+)
+```
+
+## Sampling Strategies
+
+### Dependent Variable Stratification
+
+For regression tasks, stratify by target variable bins:
+
+```{r dependent_stratification, eval = FALSE}
+# Stratified sampling by age bins
+fit_strat <- st_run(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("ABS", "SG1"),
+  algos = c("PLSR", "SVR"),
+  outer_k = 5,
+  inner_k = 5,
+  seed = 42,
+  dependent_sampling = "stratified_bin",
+  dependent_bins = 5  # 5 quantile bins
+)
+```
+
+### Independent Covariate Stratification
+
+Balance folds by external factors:
+
+```{r independent_stratification, eval = FALSE}
+# Stratify by breed and sex
+fit_cov <- st_run(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("ABS", "SG1"),
+  algos = c("PLSR", "SVR"),
+  outer_k = 5,
+  inner_k = 5,
+  seed = 42,
+  independent_sampling = "stratified",
+  stratify = list(
+    breed = sample_spectra$breed,
+    sex = sample_spectra$sex
+  )
+)
+```
+
+## Performance Metrics
+
+### Regression Metrics
+
+```{r regression_metrics, eval = FALSE}
+# View all regression metrics
+fit_reg$summary %>%
+  select(preprocess, algo, SEC, RSQcal, SEP, RSQval, Bias) %>%
+  arrange(desc(RSQval))
+```
+
+### Classification Metrics
+
+```{r classification_metrics, eval = FALSE}
+# View all classification metrics
+fit_cls$summary %>%
+  select(preprocess, algo, Accuracy, Balanced_Accuracy, F1_macro) %>%
+  arrange(desc(Accuracy))
+```
+
+## Visualization Options
+
+### Custom Plot Filtering
+
+```{r plot_filtering, eval = FALSE}
+# Plot only specific algorithms
+p1 <- st_plot_best(fit_reg, algo_filter = c("PLSR", "SVR"))
+
+# Plot only specific pretreatments
+p2 <- st_plot_best(fit_reg, preprocess_filter = c("ABS", "SG1"))
+
+# Custom selection criteria
+p3 <- st_plot_best(fit_reg, select_by = "SEP")  # Best by SEP instead of RSQval
+```
+
+### Return Plot Data
+
+```{r plot_data, eval = FALSE}
+# Get plot data for custom visualization
+plot_data <- st_plot_best(fit_reg, return_data = TRUE)
+head(plot_data)
+```
+
+## Model Comparison and Selection
+
+### Compare Multiple Pipelines
+
+```{r model_comparison, eval = FALSE}
+# Run multiple preprocessing combinations
+preprocess_combos <- combos(list(
+  c("RAW"),
+  c("ABS"),
+  c("ABS", "SG1"),
+  c("ABS", "SNV"),
+  c("ABS", "SG1", "SNV")
+))
+
+# Compare all combinations
+results_list <- list()
+for (i in seq_along(preprocess_combos)) {
+  combo <- preprocess_combos[[i]]
+  cat("Running combination:", paste(combo, collapse = "+"), "\n")
+  
+  fit <- st_run(
+    data = sample_spectra,
+    target = "Age",
+    preprocess = combo,
+    algos = c("PLSR", "SVR"),
+    outer_k = 5,
+    inner_k = 5,
+    seed = 42,
+    verbose = FALSE
+  )
+  
+  results_list[[i]] <- fit$summary %>%
+    mutate(combination = paste(combo, collapse = "+"))
+}
+
+# Combine results
+all_results <- bind_rows(results_list)
+```
+
+### Performance Ranking
+
+```{r performance_ranking, eval = FALSE}
+# Rank by different metrics
+all_results %>%
+  arrange(desc(RSQval)) %>%
+  select(combination, algo, RSQval, SEP) %>%
+  head(10)
+
+all_results %>%
+  arrange(SEP) %>%
+  select(combination, algo, RSQval, SEP) %>%
+  head(10)
+```
+
+## Hyperparameter Tuning
+
+### Custom Grid Search
+
+For advanced users, you can modify the hyperparameter grids in the source code:
+
+```{r custom_grids, eval = FALSE}
+# Example: Custom PLSR components
+# Modify in R/model.R:
+# PLS_NCOMP_GRID <- c(5, 10, 15, 20, 25, 30)
+
+# Example: Custom SVR parameters
+# Modify in R/model.R:
+# SVR_C_GRID <- c(0.1, 1, 10, 100)
+# SVR_SIGMA_GRID <- c(0.01, 0.1, 1, 10)
+```
+
+## Batch Processing
+
+### Multiple Target Variables
+
+```{r batch_processing, eval = FALSE}
+# Process multiple targets
+targets <- c("Age", "Class")
+results_batch <- list()
+
+for (target in targets) {
+  cat("Processing target:", target, "\n")
+  
+  if (target == "Age") {
+    # Regression
+    fit <- st_run(
+      data = sample_spectra,
+      target = target,
+      preprocess = c("ABS", "SG1"),
+      algos = c("PLSR", "SVR", "RF"),
+      outer_k = 5,
+      inner_k = 5,
+      seed = 42,
+      verbose = FALSE
+    )
+  } else {
+    # Classification
+    fit <- st_run(
+      data = sample_spectra,
+      target = target,
+      preprocess = c("ABS", "SG1"),
+      algos = c("SVM", "RF", "GLMNET"),
+      outer_k = 5,
+      inner_k = 5,
+      seed = 42,
+      verbose = FALSE
+    )
+  }
+  
+  results_batch[[target]] <- fit
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Memory Issues**: Reduce the number of algorithms or preprocessing methods
+2. **Convergence Problems**: Check data quality and preprocessing parameters
+3. **Slow Performance**: Use fewer outer repetitions or smaller hyperparameter grids
+
+### Performance Optimization
+
+```{r optimization, eval = FALSE}
+# For large datasets, consider:
+# 1. Reduce outer_rep
+# 2. Use fewer algorithms
+# 3. Limit preprocessing methods
+# 4. Use stratified sampling for better convergence
+
+fit_optimized <- st_run(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = c("ABS", "SG1"),  # Limit methods
+  algos = c("PLSR", "SVR"),      # Limit algorithms
+  outer_k = 5,
+  outer_rep = 1,                 # Reduce repetitions
+  inner_k = 5,
+  seed = 42,
+  verbose = TRUE
+)
+```
+
+## Best Practices
+
+1. **Start Simple**: Begin with basic preprocessing and 2-3 algorithms
+2. **Validate Thoroughly**: Use appropriate sampling strategies
+3. **Compare Metrics**: Don't rely on a single performance metric
+4. **Check Assumptions**: Verify data quality and preprocessing effects
+5. **Document Everything**: Keep track of parameters and results
+
+## Next Steps
+
+- Explore the [Model Comparison](model-comparison.html) vignette
+- Check out [Troubleshooting](troubleshooting.html) for common issues
+- See the [Getting Started](getting-started.html) vignette for basics

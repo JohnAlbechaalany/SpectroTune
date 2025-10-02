@@ -10,7 +10,8 @@ st_plot_best(
   select_by = NULL,
   preprocess_filter = NULL,
   algo_filter = NULL,
-  return_data = FALSE
+  return_data = FALSE,
+  normalize = c("row", "none", "col", "all")
 )
 }
 \arguments{

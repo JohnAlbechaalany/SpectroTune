@@ -7,7 +7,7 @@
 st_model(
   X_list,
   y,
-  algos = c("PLSR", "SVR", "GLMNET", "RIDGE", "KRR_RBF", "RF", "XGB_PCA"),
+  algos = c("PLSR", "SVR", "GLMNET", "RIDGE", "KRR_RBF", "RF", "XGB_PCA", "RF_PCA"),
   outer_k = 5,
   outer_rep = 2,
   inner_k = 5,
@@ -24,7 +24,7 @@ st_model(
 
 \item{y}{numeric response}
 
-\item{algos}{character vector among c("PLSR","SVR","GLMNET","RIDGE","KRR_RBF","RF","XGB_PCA")}
+\item{algos}{character vector among c("PLSR","SVR","GLMNET","RIDGE","KRR_RBF","RF","XGB_PCA","RF_PCA")}
 
 \item{outer_k, outer_rep, inner_k}{integers for nested CV}
 

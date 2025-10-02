@@ -68,3 +68,18 @@ st_preprocess <- function(data,
   y <- if (!is.null(target) && target %in% names(data)) data[[target]] else NULL
   list(X = out_list, y = y, wl = wl)
 }
+
+# --- Top-level preprocessing helpers (used by st_run chained pipelines) ---
+prep_raw <- function(X) X
+
+prep_abs <- function(X) -log10(pmax(X, .Machine$double.eps))
+
+prep_snv_abs <- function(X) prospectr::standardNormalVariate(prep_abs(X))
+
+prep_sg0_abs <- function(X, w = 11, p = 2, m = 0) prospectr::savitzkyGolay(prep_abs(X), m = m, p = p, w = w)
+
+prep_sg1_abs <- function(X, w = 11, p = 2, m = 1) prospectr::savitzkyGolay(prep_abs(X), m = m, p = p, w = w)
+
+prep_sg2_abs <- function(X, w = 15, p = 2, m = 2) prospectr::savitzkyGolay(prep_abs(X), m = m, p = p, w = w)
+
+prep_msc_abs <- function(X) prospectr::msc(prep_abs(X))

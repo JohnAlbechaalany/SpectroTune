@@ -5,7 +5,9 @@
 #' @param data data.frame with spectral columns named by wavelength (e.g., "400","405",...)
 #' @param target character, name of the target column in `data` (numeric → regression; factor/character → classification)
 #' @param preprocess character vector of pretreatments to evaluate. Supported: "RAW","ABS","SNV","SG0","SG1","SG2","MSC".
+#'   You can also pass chained pipelines like "ABS+SG1+SNV" or use [combos()] to generate combinations.
 #' @param preprocess_params named list of parameter lists per pretreatment, e.g. `list(SG1 = list(w=17,p=2,m=1))`.
+#'   For chained pipelines, step-specific parameters are looked up by step name (e.g., `SG1`).
 #' @param noise_range optional numeric length-2 range to exclude (e.g., c(700,705))
 #' @param wl_keep optional length-2 numeric or list of ranges to keep
 #' @param algos character vector of algorithms. Regression: "PLSR","SVR","GLMNET","RIDGE","KRR_RBF","RF","XGB_PCA". Classification: "SVM","GLMNET","RF","XGB_PCA".
@@ -38,25 +40,122 @@ st_run <- function(data,
                    outer_rep = 2,
                    inner_k = 5,
                    seed = 42,
-                   verbose = FALSE) {
-  pp <- st_preprocess(
+                   verbose = FALSE,
+                   dependent_sampling = c("random","stratified_bin"),
+                   dependent_bins = 5,
+                   independent_sampling = c("random","stratified"),
+                   stratify = NULL) {
+  dependent_sampling <- match.arg(dependent_sampling)
+  independent_sampling <- match.arg(independent_sampling)
+  # detect chained pipelines (contain '+')
+  has_chain <- any(grepl("\\+", preprocess))
+  if (!has_chain) {
+    pp <- st_preprocess(
+      data = data,
+      target = target,
+      preprocess = preprocess,
+      preprocess_params = preprocess_params,
+      noise_range = noise_range,
+      wl_keep = wl_keep
+    )
+    return(st_model(
+      X_list = pp$X,
+      y = pp$y,
+      algos = algos,
+      outer_k = outer_k,
+      outer_rep = outer_rep,
+      inner_k = inner_k,
+      seed = seed,
+      verbose = verbose,
+      dependent_sampling = dependent_sampling,
+      dependent_bins = dependent_bins,
+      independent_sampling = independent_sampling,
+      stratify = stratify
+    ))
+  }
+
+  # For chained pipelines: prepare RAW once (with range handling), then compose
+  pp0 <- st_preprocess(
     data = data,
     target = target,
-    preprocess = preprocess,
-    preprocess_params = preprocess_params,
+    preprocess = c("RAW"),
+    preprocess_params = list(),
     noise_range = noise_range,
     wl_keep = wl_keep
   )
+  X0 <- pp0$X[["RAW"]]
+  y  <- pp0$y
+
+  # Map of step functions defined in the package
+  step_map <- list(
+    RAW = prep_raw,
+    ABS = prep_abs,
+    SNV = prep_snv_abs,
+    SG0 = prep_sg0_abs,
+    SG1 = prep_sg1_abs,
+    SG2 = prep_sg2_abs,
+    MSC = prep_msc_abs
+  )
+  build_chain_fn <- function(steps) {
+    function(X) {
+      Xc <- X
+      for (s in steps) {
+        fn <- step_map[[s]]
+        if (is.null(fn)) stop(sprintf("Unknown preprocess step: %s", s))
+        params <- preprocess_params[[s]]
+        if (is.null(params)) params <- list()
+        Xc <- do.call(fn, c(list(X = Xc), params))
+      }
+      Xc
+    }
+  }
+  # Normalize preprocess vector (e.g., from combos()) into character chains
+  chains <- as.character(preprocess)
+  X_list <- list()
+  for (ch in chains) {
+    steps <- unlist(strsplit(ch, "\\+"))
+    steps <- steps[steps != ""]
+    fn <- build_chain_fn(steps)
+    X_list[[ch]] <- fn(X0)
+  }
   st_model(
-    X_list = pp$X,
-    y = pp$y,
+    X_list = X_list,
+    y = y,
     algos = algos,
     outer_k = outer_k,
     outer_rep = outer_rep,
     inner_k = inner_k,
     seed = seed,
-    verbose = verbose
+    verbose = verbose,
+    dependent_sampling = dependent_sampling,
+    dependent_bins = dependent_bins,
+    independent_sampling = independent_sampling,
+    stratify = stratify
   )
+}
+
+#' Generate chained pretreatment combinations
+#'
+#' Convenience helper to build vectors of chained pipelines (e.g., "ABS+SG1", "ABS+SG2+SNV").
+#'
+#' @param parts a list of character vectors; each element represents a choice set for a step.
+#'   Use \code{NULL} or \code{NA} inside a choice set to indicate an optional step.
+#' @return a character vector of pipeline strings joined by '+'
+#' @examples
+#' # ABS; then choose SG1 or SG2; optionally add SNV
+#' # combos(list(c("ABS"), c("SG1","SG2"), c("SNV", NA)))
+#' @export
+combos <- function(parts) {
+  if (!is.list(parts)) stop("parts must be a list of character vectors")
+  # replace NULL with NA for expand.grid compatibility
+  parts2 <- lapply(parts, function(v) if (is.null(v)) NA_character_ else v)
+  eg <- do.call(expand.grid, c(parts2, stringsAsFactors = FALSE))
+  out <- apply(eg, 1, function(row) {
+    steps <- as.character(row)
+    steps <- steps[!is.na(steps) & steps != ""]
+    paste(steps, collapse = "+")
+  })
+  unique(out[nchar(out) > 0])
 }
 
 #' Plot best pipeline results (regression or classification)
@@ -82,9 +181,11 @@ st_plot_best <- function(fit,
                          select_by = NULL,
                          preprocess_filter = NULL,
                          algo_filter = NULL,
-                         return_data = FALSE) {
+                         return_data = FALSE,
+                         normalize = c("row","none","col","all")) {
   stopifnot(is.list(fit), !is.null(fit$results), !is.null(fit$summary))
   task <- match.arg(task)
+  normalize <- match.arg(normalize)
   res_df <- fit$results
   summ   <- fit$summary
   # detect task
@@ -116,13 +217,54 @@ st_plot_best <- function(fit,
       ggplot2::labs(title = title_txt, x = "Truth", y = "OOF prediction") +
       ggplot2::theme_minimal()
   } else {
+    # Ensure both truth and pred share the same, explicit levels
+    lvl <- sort(unique(c(as.character(best_df$truth), as.character(best_df$pred))))
+    best_df$truth <- factor(best_df$truth, levels = lvl)
+    best_df$pred  <- factor(best_df$pred,  levels = lvl)
+
+    # Build confusion matrix including zero-count cells
     cm <- dplyr::count(best_df, truth, pred, name = "n")
-    total_by_truth <- dplyr::group_by(cm, truth) %>% dplyr::mutate(pct = n / sum(n))
-    p <- ggplot2::ggplot(total_by_truth, ggplot2::aes(pred, truth, fill = pct)) +
-      ggplot2::geom_tile() +
-      ggplot2::geom_text(ggplot2::aes(label = scales::percent(pct, accuracy = 1))) +
-      ggplot2::scale_fill_gradient(low = "white", high = "steelblue") +
-      ggplot2::labs(title = sprintf("%s + %s  (Acc=%.3f)", best$prep, best$algo, ifelse("Accuracy" %in% names(best), best$Accuracy, NA_real_)), x = "Predicted", y = "Observed") +
+    cm <- tidyr::complete(cm,
+                          truth = levels(best_df$truth),
+                          pred  = levels(best_df$pred),
+                          fill  = list(n = 0L))
+
+    # Compute normalization
+    if (normalize == "none") {
+      cm$fill <- cm$n
+      cm$label <- ifelse(cm$n == 0, "", as.character(cm$n))
+      fill_name <- "count"
+      subtitle  <- "Confusion matrix (counts)"
+    } else if (normalize == "row") {
+      cm <- dplyr::group_by(cm, truth)
+      cm <- dplyr::mutate(cm, denom = sum(n), pct = ifelse(denom > 0, n/denom, 0))
+      cm <- dplyr::ungroup(cm)
+      cm$fill  <- cm$pct
+      cm$label <- scales::percent(cm$pct, accuracy = 1)
+      fill_name <- "row %"
+      subtitle  <- "Row-normalized (per observed class)"
+    } else if (normalize == "col") {
+      cm <- dplyr::group_by(cm, pred)
+      cm <- dplyr::mutate(cm, denom = sum(n), pct = ifelse(denom > 0, n/denom, 0))
+      cm <- dplyr::ungroup(cm)
+      cm$fill  <- cm$pct
+      cm$label <- scales::percent(cm$pct, accuracy = 1)
+      fill_name <- "col %"
+      subtitle  <- "Column-normalized (per predicted class)"
+    } else {
+      total_n <- sum(cm$n)
+      cm$pct <- ifelse(total_n > 0, cm$n/total_n, 0)
+      cm$fill  <- cm$pct
+      cm$label <- scales::percent(cm$pct, accuracy = 1)
+      fill_name <- "overall %"
+      subtitle  <- "Overall-normalized"
+    }
+
+    p <- ggplot2::ggplot(cm, ggplot2::aes(pred, truth, fill = fill)) +
+      ggplot2::geom_tile(color = "grey80") +
+      ggplot2::geom_text(ggplot2::aes(label = label)) +
+      ggplot2::scale_fill_gradient(low = "white", high = "steelblue", name = fill_name, limits = if (normalize == "none") NULL else c(0,1)) +
+      ggplot2::labs(title = sprintf("%s + %s  (Acc=%.3f)", best$prep, best$algo, ifelse("Accuracy" %in% names(best), best$Accuracy, NA_real_)), subtitle = subtitle, x = "Predicted", y = "Observed") +
       ggplot2::theme_minimal()
   }
   if (isTRUE(return_data)) return(list(plot = p, data = best_df, selection = best)) else return(p)

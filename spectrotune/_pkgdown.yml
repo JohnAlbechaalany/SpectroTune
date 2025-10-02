@@ -1,0 +1,57 @@
+url: https://johnalbechaalany.github.io/spectrotune/
+
+template:
+  params:
+    bootswatch: cosmo
+
+home:
+  title: SpectroTune
+  description: |
+    Comprehensive spectral data analysis package for pretreatment, model benchmarking, and visualization.
+  sidebar:
+    structure: [links, license, community, citation, authors, dev]
+  authors:
+    John Albechaalany:
+      href: mailto:Johnbechaalany@gmail.com
+
+reference:
+- title: "Main Functions"
+  desc: "Core functions for spectral analysis"
+  contents:
+  - st_run
+  - st_preprocess
+  - st_model
+  - st_plot_best
+  - st_fit_final
+  - st_save_final
+  - combos
+
+- title: "Data"
+  desc: "Sample datasets"
+  contents:
+  - sample_spectra
+
+articles:
+- title: "Getting Started"
+  contents:
+  - getting-started
+- title: "Advanced Features"
+  contents:
+  - advanced-features
+- title: "Model Comparison"
+  contents:
+  - model-comparison
+- title: "Troubleshooting"
+  contents:
+  - troubleshooting
+
+news:
+  releases:
+  - title: "SpectroTune 1.0.0"
+    date: "2025-01-02"
+    contents:
+    - "Initial release of SpectroTune package"
+    - "Comprehensive spectral pretreatment methods"
+    - "Multiple regression and classification algorithms"
+    - "Nested cross-validation with flexible sampling"
+    - "Advanced visualization and model selection tools"

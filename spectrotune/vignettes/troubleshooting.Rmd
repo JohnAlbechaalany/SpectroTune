@@ -1,0 +1,556 @@
+---
+title: "Troubleshooting SpectroTune"
+author: "John Albechaalany"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Troubleshooting SpectroTune}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 5
+)
+```
+
+# Troubleshooting SpectroTune
+
+This vignette addresses common issues and provides solutions for problems you might encounter when using SpectroTune.
+
+```{r load}
+library(spectrotune)
+library(ggplot2)
+```
+
+## Installation Issues
+
+### Package Installation Problems
+
+**Problem**: `Error in loadNamespace(x) : there is no package called 'devtools'`
+
+**Solution**:
+```{r install_devtools, eval = FALSE}
+# Install required packages
+install.packages(c("devtools", "roxygen2"))
+
+# If on Windows, install Rtools
+# Download from: https://cran.rstudio.com/bin/windows/Rtools/
+```
+
+**Problem**: `Warning: cannot remove prior installation of package 'roxygen2'`
+
+**Solution**:
+```{r fix_roxygen, eval = FALSE}
+# 1. Restart R/RStudio
+# 2. Remove package manually
+remove.packages("roxygen2")
+
+# 3. Delete lock folders (Windows)
+# Navigate to: C:\Users\[username]\AppData\Local\R\win-library\[version]\
+# Delete: 00LOCK\roxygen2\ and roxygen2\ folders
+
+# 4. Reinstall
+install.packages("roxygen2", type = "binary")
+```
+
+### Permission Denied Errors
+
+**Problem**: `Permission denied` when installing packages
+
+**Solution**:
+```{r fix_permissions, eval = FALSE}
+# Check library paths
+.libPaths()
+
+# Install to user library
+install.packages("package_name", lib = .libPaths()[1])
+
+# Or run R as administrator (Windows)
+```
+
+## Data Format Issues
+
+### Column Name Problems
+
+**Problem**: `Error: TARGET_COL %in% names(raw_df) is not TRUE`
+
+**Solution**:
+```{r fix_column_names, eval = FALSE}
+# Check column names
+names(your_data)
+
+# Ensure target column exists and is properly named
+# The function will automatically detect and rename target columns
+# Make sure your target column name is consistent
+
+# Example: If your target is "Age" but column is "age"
+names(your_data)[names(your_data) == "age"] <- "Age"
+```
+
+### Spectral Column Format
+
+**Problem**: Spectral columns not recognized
+
+**Solution**:
+```{r fix_spectral_columns, eval = FALSE}
+# Check if spectral columns are numeric
+str(your_data)
+
+# Convert to numeric if needed
+spectral_cols <- grep("^[0-9]+$", names(your_data), value = TRUE)
+your_data[spectral_cols] <- lapply(your_data[spectral_cols], as.numeric)
+
+# Ensure column names are wavelength values
+# Example: "400", "405", "410", etc.
+```
+
+### Missing Values
+
+**Problem**: `Error: missing values in data`
+
+**Solution**:
+```{r fix_missing_values, eval = FALSE}
+# Check for missing values
+sum(is.na(your_data))
+
+# Remove rows with missing values
+your_data <- your_data[complete.cases(your_data), ]
+
+# Or impute missing values
+# For spectra, consider interpolation
+library(zoo)
+your_data[spectral_cols] <- lapply(your_data[spectral_cols], 
+                                   function(x) na.approx(x, na.rm = FALSE))
+```
+
+## Model Training Issues
+
+### Convergence Problems
+
+**Problem**: Models not converging or poor performance
+
+**Solution**:
+```{r fix_convergence, eval = FALSE}
+# 1. Check data quality
+summary(your_data$target_variable)
+hist(your_data$target_variable)
+
+# 2. Try different preprocessing
+pp <- st_preprocess(
+  data = your_data,
+  target = "target_variable",
+  preprocess = c("RAW", "ABS", "SNV"),  # Start simple
+  noise_range = NULL
+)
+
+# 3. Reduce model complexity
+fit <- st_run(
+  data = your_data,
+  target = "target_variable",
+  preprocess = c("ABS"),  # Single preprocessing
+  algos = c("PLSR", "SVR"),  # Fewer algorithms
+  outer_k = 3,  # Smaller CV
+  inner_k = 3,
+  outer_rep = 1,  # Single repetition
+  seed = 42
+)
+```
+
+### Memory Issues
+
+**Problem**: `Error: cannot allocate vector of size X Mb`
+
+**Solution**:
+```{r fix_memory, eval = FALSE}
+# 1. Reduce dataset size
+your_data_small <- your_data[sample(nrow(your_data), 100), ]
+
+# 2. Use fewer preprocessing methods
+preprocess_simple <- c("ABS", "SG1")
+
+# 3. Use fewer algorithms
+algos_simple <- c("PLSR", "SVR")
+
+# 4. Reduce CV parameters
+fit <- st_run(
+  data = your_data_small,
+  target = "target_variable",
+  preprocess = preprocess_simple,
+  algos = algos_simple,
+  outer_k = 3,
+  inner_k = 3,
+  outer_rep = 1,
+  seed = 42
+)
+```
+
+### Slow Performance
+
+**Problem**: Models taking too long to train
+
+**Solution**:
+```{r fix_performance, eval = FALSE}
+# 1. Reduce hyperparameter grids
+# Edit R/model.R to use smaller grids:
+# PLS_NCOMP_GRID <- c(5, 10, 15)  # Instead of c(5, 10, 15, 20, 25, 30)
+# SVR_C_GRID <- c(1, 10)  # Instead of c(0.1, 1, 10, 100)
+
+# 2. Use parallel processing
+# Install and load parallel
+install.packages("parallel")
+library(parallel)
+
+# 3. Reduce CV repetitions
+fit <- st_run(
+  data = your_data,
+  target = "target_variable",
+  preprocess = c("ABS", "SG1"),
+  algos = c("PLSR", "SVR"),
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 1,  # Single repetition
+  seed = 42
+)
+```
+
+## Preprocessing Issues
+
+### Savitzky-Golay Parameters
+
+**Problem**: `Error in sgolayfilt: filter length must be odd`
+
+**Solution**:
+```{r fix_sg_params, eval = FALSE}
+# Ensure window size is odd
+preprocess_params <- list(
+  SG1 = list(w = 17, p = 2, m = 1),  # w must be odd
+  SG2 = list(w = 21, p = 4, m = 2)   # w must be odd
+)
+
+# Check parameter validity
+w <- 17  # Window size
+p <- 2   # Polynomial order
+m <- 1   # Derivative order
+
+# w must be odd and > p
+if (w %% 2 == 0) stop("Window size must be odd")
+if (w <= p) stop("Window size must be greater than polynomial order")
+```
+
+### Wavelength Range Issues
+
+**Problem**: `Error: wavelength range not found`
+
+**Solution**:
+```{r fix_wavelength_ranges, eval = FALSE}
+# Check available wavelengths
+wl_cols <- grep("^[0-9]+$", names(your_data), value = TRUE)
+wl_values <- as.numeric(wl_cols)
+range(wl_values)
+
+# Use valid ranges
+pp <- st_preprocess(
+  data = your_data,
+  target = "target_variable",
+  preprocess = c("ABS", "SG1"),
+  wl_keep = c(400, 2000),  # Within available range
+  noise_range = c(700, 705)  # Within available range
+)
+```
+
+## Visualization Issues
+
+### Plot Not Displaying
+
+**Problem**: `st_plot_best()` not showing plot
+
+**Solution**:
+```{r fix_plotting, eval = FALSE}
+# 1. Check if fit object is valid
+str(fit)
+
+# 2. Ensure plot is printed
+p <- st_plot_best(fit)
+print(p)  # Explicitly print
+
+# 3. Check for errors in fit
+if (is.null(fit$summary)) {
+  stop("No results to plot. Check if model training completed successfully.")
+}
+
+# 4. Try different plot options
+p <- st_plot_best(fit, return_data = TRUE)
+head(p)
+```
+
+### Empty Results
+
+**Problem**: `fit$summary` is empty or NULL
+
+**Solution**:
+```{r fix_empty_results, eval = FALSE}
+# 1. Check if training completed
+if (is.null(fit$summary)) {
+  cat("Model training failed. Check error messages above.\n")
+}
+
+# 2. Verify data format
+str(your_data)
+
+# 3. Check target variable
+summary(your_data$target_variable)
+
+# 4. Try with minimal parameters
+fit_minimal <- st_run(
+  data = your_data,
+  target = "target_variable",
+  preprocess = "RAW",
+  algos = "PLSR",
+  outer_k = 3,
+  inner_k = 3,
+  outer_rep = 1,
+  seed = 42,
+  verbose = TRUE
+)
+```
+
+## Performance Issues
+
+### Poor Model Performance
+
+**Problem**: Low R² or accuracy values
+
+**Solution**:
+```{r fix_poor_performance, eval = FALSE}
+# 1. Check data quality
+# Look for outliers
+boxplot(your_data$target_variable)
+
+# 2. Try different preprocessing
+preprocess_options <- c("RAW", "ABS", "SNV", "SG1", "MSC")
+for (prep in preprocess_options) {
+  fit <- st_run(
+    data = your_data,
+    target = "target_variable",
+    preprocess = prep,
+    algos = "PLSR",
+    outer_k = 5,
+    inner_k = 5,
+    seed = 42,
+    verbose = FALSE
+  )
+  cat(prep, ":", fit$best$RSQval, "\n")
+}
+
+# 3. Check for overfitting
+# Compare calibration vs validation metrics
+fit$summary[, c("RSQcal", "RSQval")]
+
+# 4. Try different algorithms
+algos_options <- c("PLSR", "SVR", "RF", "GLMNET")
+for (algo in algos_options) {
+  fit <- st_run(
+    data = your_data,
+    target = "target_variable",
+    preprocess = "ABS",
+    algos = algo,
+    outer_k = 5,
+    inner_k = 5,
+    seed = 42,
+    verbose = FALSE
+  )
+  cat(algo, ":", fit$best$RSQval, "\n")
+}
+```
+
+### Unstable Results
+
+**Problem**: High variance in CV results
+
+**Solution**:
+```{r fix_unstable_results, eval = FALSE}
+# 1. Increase CV repetitions
+fit <- st_run(
+  data = your_data,
+  target = "target_variable",
+  preprocess = c("ABS", "SG1"),
+  algos = c("PLSR", "SVR"),
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 5,  # More repetitions
+  seed = 42
+)
+
+# 2. Use stratified sampling
+fit <- st_run(
+  data = your_data,
+  target = "target_variable",
+  preprocess = c("ABS", "SG1"),
+  algos = c("PLSR", "SVR"),
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 3,
+  dependent_sampling = "stratified_bin",
+  dependent_bins = 5,
+  seed = 42
+)
+
+# 3. Check for data leakage
+# Ensure no target information in spectral data
+cor(your_data$target_variable, your_data[, grep("^[0-9]+$", names(your_data))])
+```
+
+## Debugging Tips
+
+### Enable Verbose Output
+
+```{r debugging, eval = FALSE}
+# Always use verbose = TRUE for debugging
+fit <- st_run(
+  data = your_data,
+  target = "target_variable",
+  preprocess = c("ABS", "SG1"),
+  algos = c("PLSR", "SVR"),
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 2,
+  seed = 42,
+  verbose = TRUE  # Enable progress messages
+)
+```
+
+### Check Intermediate Results
+
+```{r intermediate_results, eval = FALSE}
+# 1. Test preprocessing separately
+pp <- st_preprocess(
+  data = your_data,
+  target = "target_variable",
+  preprocess = c("ABS", "SG1"),
+  verbose = TRUE
+)
+
+# Check preprocessing results
+str(pp)
+dim(pp$X$ABS)
+summary(pp$y)
+
+# 2. Test modeling separately
+fit <- st_model(
+  X_list = pp$X,
+  y = pp$y,
+  algos = "PLSR",
+  outer_k = 3,
+  inner_k = 3,
+  outer_rep = 1,
+  seed = 42,
+  verbose = TRUE
+)
+```
+
+### Validate Data
+
+```{r validate_data, eval = FALSE}
+# Create data validation function
+validate_spectral_data <- function(data, target) {
+  # Check target exists
+  if (!target %in% names(data)) {
+    stop("Target column not found")
+  }
+  
+  # Check spectral columns
+  spectral_cols <- grep("^[0-9]+$", names(data), value = TRUE)
+  if (length(spectral_cols) == 0) {
+    stop("No spectral columns found")
+  }
+  
+  # Check for missing values
+  if (any(is.na(data[target]))) {
+    stop("Missing values in target variable")
+  }
+  
+  # Check for infinite values
+  if (any(is.infinite(data[target]))) {
+    stop("Infinite values in target variable")
+  }
+  
+  cat("Data validation passed!\n")
+  cat("Samples:", nrow(data), "\n")
+  cat("Wavelengths:", length(spectral_cols), "\n")
+  cat("Target range:", range(data[target]), "\n")
+}
+
+# Use validation
+validate_spectral_data(your_data, "target_variable")
+```
+
+## Getting Help
+
+### Error Messages
+
+When encountering errors:
+
+1. **Read the full error message** - it often contains clues
+2. **Check the data format** - ensure it matches requirements
+3. **Try minimal examples** - isolate the problem
+4. **Use verbose output** - see where the process fails
+5. **Check package documentation** - `?function_name`
+
+### Common Error Patterns
+
+```{r error_patterns, eval = FALSE}
+# Pattern 1: Column not found
+# Error: TARGET_COL %in% names(raw_df) is not TRUE
+# Solution: Check column names and target specification
+
+# Pattern 2: Memory issues
+# Error: cannot allocate vector of size X Mb
+# Solution: Reduce dataset size or model complexity
+
+# Pattern 3: Convergence issues
+# Warning: model did not converge
+# Solution: Check data quality and preprocessing
+
+# Pattern 4: Package loading
+# Error in loadNamespace(x) : there is no package called 'X'
+# Solution: Install missing dependencies
+```
+
+### Support Resources
+
+1. **Package Documentation**: `help(package = "spectrotune")`
+2. **Function Help**: `?st_run`, `?st_preprocess`, etc.
+3. **Vignettes**: `browseVignettes("spectrotune")`
+4. **GitHub Issues**: Report bugs and request features
+5. **Email Support**: Johnbechaalany@gmail.com
+
+## Summary
+
+This troubleshooting guide covers:
+
+1. **Installation Issues**: Package dependencies and permissions
+2. **Data Format Problems**: Column names, spectral format, missing values
+3. **Model Training Issues**: Convergence, memory, performance
+4. **Preprocessing Problems**: Parameter validation, wavelength ranges
+5. **Visualization Issues**: Plotting and result display
+6. **Performance Problems**: Poor results and instability
+7. **Debugging Tips**: Verbose output and validation
+8. **Getting Help**: Error patterns and support resources
+
+Remember to:
+- Always validate your data before analysis
+- Start with simple examples and build complexity
+- Use verbose output for debugging
+- Check package documentation for function requirements
+- Report issues with reproducible examples
+
+## Next Steps
+
+- Explore the [Getting Started](getting-started.html) vignette
+- Check out [Advanced Features](advanced-features.html) for more options
+- See [Model Comparison](model-comparison.html) for analysis techniques

@@ -16,7 +16,11 @@ st_run(
   outer_rep = 2,
   inner_k = 5,
   seed = 42,
-  verbose = FALSE
+  verbose = FALSE,
+  dependent_sampling = c("random", "stratified_bin"),
+  dependent_bins = 5,
+  independent_sampling = c("random", "stratified"),
+  stratify = NULL
 )
 }
 \arguments{
@@ -24,9 +28,11 @@ st_run(
 
 \item{target}{character, name of the target column in \code{data} (numeric → regression; factor/character → classification)}
 
-\item{preprocess}{character vector of pretreatments to evaluate. Supported: "RAW","ABS","SNV","SG0","SG1","SG2","MSC".}
+\item{preprocess}{character vector of pretreatments to evaluate. Supported: "RAW","ABS","SNV","SG0","SG1","SG2","MSC".
+You can also pass chained pipelines like "ABS+SG1+SNV" or use \code{\link[=combos]{combos()}} to generate combinations.}
 
-\item{preprocess_params}{named list of parameter lists per pretreatment, e.g. \code{list(SG1 = list(w=17,p=2,m=1))}.}
+\item{preprocess_params}{named list of parameter lists per pretreatment, e.g. \code{list(SG1 = list(w=17,p=2,m=1))}.
+For chained pipelines, step-specific parameters are looked up by step name (e.g., \code{SG1}).}
 
 \item{noise_range}{optional numeric length-2 range to exclude (e.g., c(700,705))}
 

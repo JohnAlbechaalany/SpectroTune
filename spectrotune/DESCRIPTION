@@ -2,7 +2,7 @@ Package: spectrotune
 Title: Spectral Pretreatment and Nested CV Modeling
 Version: 1.0.0
 Authors@R: person("John", "Albechaalany", email = "Johnbechaalany@gmail.com", role = c("aut","cre"))
-Description: Apply configurable spectral pretreatments and run nested cross-validation for PLSR and SVR models.
+Description: Comprehensive spectral data analysis package for pretreatment, model benchmarking, and visualization. Supports regression and classification with nested cross-validation, multiple algorithms (PLSR, SVR, GLMNET, RIDGE, KRR_RBF, RF, XGB_PCA, RF_PCA, SVM, PLSDA), and advanced sampling strategies.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
@@ -22,6 +22,14 @@ Imports:
     caret,
     glmnet,
     ranger,
-    xgboost
+    xgboost,
+    mixOmics,
+    magrittr
+Suggests:
+    testthat,
+    knitr,
+    rmarkdown,
+    pkgdown
+VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

@@ -1,0 +1,401 @@
+---
+title: "Model Comparison and Selection in SpectroTune"
+author: "John Albechaalany"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Model Comparison and Selection in SpectroTune}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 10,
+  fig.height = 6
+)
+```
+
+# Model Comparison and Selection
+
+This vignette demonstrates how to compare different models and select the best performing pipeline in SpectroTune.
+
+```{r load}
+library(spectrotune)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(scales)
+```
+
+## Comprehensive Model Comparison
+
+### Setup Comparison Study
+
+```{r setup_comparison, eval = FALSE}
+# Define comprehensive comparison
+preprocess_methods <- c("RAW", "ABS", "SG1", "SNV", "MSC")
+algorithms_reg <- c("PLSR", "SVR", "GLMNET", "RIDGE", "RF", "XGB_PCA")
+algorithms_cls <- c("SVM", "GLMNET", "RF", "XGB_PCA", "PLSDA")
+
+# Run regression comparison
+fit_reg <- st_run(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = preprocess_methods,
+  algos = algorithms_reg,
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 2,
+  seed = 42,
+  verbose = TRUE
+)
+
+# Run classification comparison
+fit_cls <- st_run(
+  data = sample_spectra,
+  target = "Class",
+  preprocess = preprocess_methods,
+  algos = algorithms_cls,
+  outer_k = 5,
+  inner_k = 5,
+  outer_rep = 2,
+  seed = 42,
+  verbose = TRUE
+)
+```
+
+## Performance Analysis
+
+### Regression Results
+
+```{r regression_analysis, eval = FALSE}
+# View regression summary
+reg_summary <- fit_reg$summary
+head(reg_summary)
+
+# Top 10 models by R²
+top_models_reg <- reg_summary %>%
+  arrange(desc(RSQval)) %>%
+  head(10)
+
+print(top_models_reg)
+```
+
+### Classification Results
+
+```{r classification_analysis, eval = FALSE}
+# View classification summary
+cls_summary <- fit_cls$summary
+head(cls_summary)
+
+# Top 10 models by Accuracy
+top_models_cls <- cls_summary %>%
+  arrange(desc(Accuracy)) %>%
+  head(10)
+
+print(top_models_cls)
+```
+
+## Visualization of Results
+
+### Performance Heatmaps
+
+```{r heatmaps, eval = FALSE}
+# Regression heatmap
+reg_heatmap <- reg_summary %>%
+  select(preprocess, algo, RSQval) %>%
+  pivot_wider(names_from = algo, values_from = RSQval) %>%
+  column_to_rownames("preprocess") %>%
+  as.matrix()
+
+# Create heatmap
+heatmap(reg_heatmap, 
+        main = "R² Validation by Preprocessing and Algorithm",
+        xlab = "Algorithm", 
+        ylab = "Preprocessing",
+        col = colorRampPalette(c("white", "blue"))(100))
+
+# Classification heatmap
+cls_heatmap <- cls_summary %>%
+  select(preprocess, algo, Accuracy) %>%
+  pivot_wider(names_from = algo, values_from = Accuracy) %>%
+  column_to_rownames("preprocess") %>%
+  as.matrix()
+
+heatmap(cls_heatmap,
+        main = "Accuracy by Preprocessing and Algorithm",
+        xlab = "Algorithm",
+        ylab = "Preprocessing",
+        col = colorRampPalette(c("white", "red"))(100))
+```
+
+### Boxplot Comparisons
+
+```{r boxplots, eval = FALSE}
+# Algorithm comparison (regression)
+p1 <- ggplot(reg_summary, aes(x = algo, y = RSQval, fill = algo)) +
+  geom_boxplot() +
+  labs(title = "R² Validation by Algorithm",
+       x = "Algorithm", y = "R² Validation") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Preprocessing comparison (regression)
+p2 <- ggplot(reg_summary, aes(x = preprocess, y = RSQval, fill = preprocess)) +
+  geom_boxplot() +
+  labs(title = "R² Validation by Preprocessing",
+       x = "Preprocessing", y = "R² Validation") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Algorithm comparison (classification)
+p3 <- ggplot(cls_summary, aes(x = algo, y = Accuracy, fill = algo)) +
+  geom_boxplot() +
+  labs(title = "Accuracy by Algorithm",
+       x = "Algorithm", y = "Accuracy") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Preprocessing comparison (classification)
+p4 <- ggplot(cls_summary, aes(x = preprocess, y = Accuracy, fill = preprocess)) +
+  geom_boxplot() +
+  labs(title = "Accuracy by Preprocessing",
+       x = "Preprocessing", y = "Accuracy") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Display plots
+print(p1)
+print(p2)
+print(p3)
+print(p4)
+```
+
+## Statistical Analysis
+
+### Performance Differences
+
+```{r statistical_analysis, eval = FALSE}
+# ANOVA for algorithm effects (regression)
+reg_anova <- aov(RSQval ~ algo, data = reg_summary)
+summary(reg_anova)
+
+# ANOVA for preprocessing effects (regression)
+prep_anova <- aov(RSQval ~ preprocess, data = reg_summary)
+summary(prep_anova)
+
+# Post-hoc tests
+if (require(TukeyHSD)) {
+  tukey_algo <- TukeyHSD(reg_anova)
+  print(tukey_algo)
+}
+```
+
+### Correlation Analysis
+
+```{r correlation, eval = FALSE}
+# Correlation between metrics
+reg_cor <- reg_summary %>%
+  select(RSQval, SEP, Bias) %>%
+  cor()
+
+print(reg_cor)
+
+# Visualize correlations
+if (require(corrplot)) {
+  corrplot(reg_cor, method = "circle", type = "upper")
+}
+```
+
+## Model Selection Strategies
+
+### Single Best Model
+
+```{r single_best, eval = FALSE}
+# Best regression model
+best_reg <- fit_reg$best
+print(best_reg)
+
+# Best classification model
+best_cls <- fit_cls$best
+print(best_cls)
+
+# Plot best models
+p_best_reg <- st_plot_best(fit_reg)
+p_best_cls <- st_plot_best(fit_cls)
+
+print(p_best_reg)
+print(p_best_cls)
+```
+
+### Top-K Models
+
+```{r top_k, eval = FALSE}
+# Top 5 regression models
+top5_reg <- reg_summary %>%
+  arrange(desc(RSQval)) %>%
+  head(5)
+
+print(top5_reg)
+
+# Top 5 classification models
+top5_cls <- cls_summary %>%
+  arrange(desc(Accuracy)) %>%
+  head(5)
+
+print(top5_cls)
+```
+
+### Ensemble Selection
+
+```{r ensemble, eval = FALSE}
+# Select diverse top models for ensemble
+ensemble_reg <- reg_summary %>%
+  arrange(desc(RSQval)) %>%
+  group_by(algo) %>%
+  slice_head(n = 1) %>%
+  ungroup() %>%
+  head(3)
+
+print(ensemble_reg)
+
+ensemble_cls <- cls_summary %>%
+  arrange(desc(Accuracy)) %>%
+  group_by(algo) %>%
+  slice_head(n = 1) %>%
+  ungroup() %>%
+  head(3)
+
+print(ensemble_cls)
+```
+
+## Cross-Validation Stability
+
+### Performance Stability Analysis
+
+```{r stability, eval = FALSE}
+# Analyze CV stability
+stability_reg <- reg_summary %>%
+  group_by(preprocess, algo) %>%
+  summarise(
+    mean_RSQval = mean(RSQval),
+    sd_RSQval = sd(RSQval),
+    cv_RSQval = sd_RSQval / mean_RSQval,
+    .groups = "drop"
+  ) %>%
+  arrange(desc(mean_RSQval))
+
+print(stability_reg)
+
+# Plot stability
+p_stability <- ggplot(stability_reg, aes(x = mean_RSQval, y = sd_RSQval)) +
+  geom_point(aes(color = cv_RSQval), size = 3) +
+  geom_text(aes(label = paste(preprocess, algo, sep = "+")), 
+            hjust = 0, vjust = 0, size = 3) +
+  labs(title = "Model Stability Analysis",
+       x = "Mean R² Validation", 
+       y = "SD R² Validation",
+       color = "CV") +
+  theme_minimal()
+
+print(p_stability)
+```
+
+## Practical Selection Guidelines
+
+### Selection Criteria
+
+```{r selection_criteria, eval = FALSE}
+# Multi-criteria selection
+selection_reg <- reg_summary %>%
+  mutate(
+    # Normalize metrics (0-1 scale)
+    RSQval_norm = (RSQval - min(RSQval)) / (max(RSQval) - min(RSQval)),
+    SEP_norm = 1 - (SEP - min(SEP)) / (max(SEP) - min(SEP)),  # Invert (lower is better)
+    Bias_norm = 1 - abs(Bias) / max(abs(Bias)),  # Invert (lower is better)
+    
+    # Combined score
+    combined_score = (RSQval_norm + SEP_norm + Bias_norm) / 3
+  ) %>%
+  arrange(desc(combined_score))
+
+print(selection_reg)
+```
+
+### Robustness Check
+
+```{r robustness, eval = FALSE}
+# Check robustness across different metrics
+robustness_reg <- reg_summary %>%
+  mutate(
+    rank_RSQval = rank(desc(RSQval)),
+    rank_SEP = rank(SEP),  # Lower is better
+    rank_Bias = rank(abs(Bias)),  # Lower is better
+    avg_rank = (rank_RSQval + rank_SEP + rank_Bias) / 3
+  ) %>%
+  arrange(avg_rank)
+
+print(robustness_reg)
+```
+
+## Final Model Selection
+
+### Recommended Workflow
+
+```{r final_selection, eval = FALSE}
+# 1. Identify top performers
+top_performers <- reg_summary %>%
+  filter(RSQval > quantile(RSQval, 0.8))  # Top 20%
+
+# 2. Check stability
+stable_models <- top_performers %>%
+  filter(RSQval > mean(RSQval) - sd(RSQval))  # Within 1 SD of mean
+
+# 3. Final selection
+final_models <- stable_models %>%
+  arrange(desc(RSQval)) %>%
+  head(3)
+
+print(final_models)
+
+# 4. Fit final model
+best_pipeline <- final_models[1, ]
+final_model <- st_fit_final(
+  data = sample_spectra,
+  target = "Age",
+  preprocess = best_pipeline$preprocess,
+  algo = best_pipeline$algo,
+  inner_k = 5,
+  seed = 42
+)
+
+# 5. Save for deployment
+st_save_final(final_model, "best_spectral_model.rds")
+```
+
+## Summary
+
+This vignette demonstrated:
+
+1. **Comprehensive Comparison**: How to compare multiple preprocessing methods and algorithms
+2. **Performance Analysis**: Statistical analysis of model performance
+3. **Visualization**: Heatmaps, boxplots, and stability plots
+4. **Selection Strategies**: Single best, top-K, and ensemble approaches
+5. **Robustness**: Multi-criteria selection and stability analysis
+6. **Final Selection**: Practical workflow for model deployment
+
+Remember to:
+- Consider multiple metrics, not just one
+- Check model stability across CV folds
+- Validate on independent test sets when possible
+- Document your selection process
+- Consider computational cost vs. performance trade-offs
+
+## Next Steps
+
+- Explore the [Advanced Features](advanced-features.html) vignette
+- Check out [Troubleshooting](troubleshooting.html) for common issues
+- See the [Getting Started](getting-started.html) vignette for basics
